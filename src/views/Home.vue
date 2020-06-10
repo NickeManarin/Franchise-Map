@@ -940,7 +940,7 @@
                 if (type) {
                     switch (type) {
                         case "all":
-                            this.generateBlob('Franquia.json', row, true);
+                            this.generateBlob('Franquia.json', new Array(row), true);
                         break;
 
                         case "city":
