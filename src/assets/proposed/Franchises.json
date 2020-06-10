@@ -1,0 +1,30 @@
+[ 
+    { 
+        "id": 0,
+        "desc": "Rio Grande do Sul - Porto Alegre", 
+        "accent": "#38f",
+        "level": "MF",
+
+        "properties": {
+            "Nome": "Joana"
+        }, 
+        
+        "cities": [
+            "4314902", "4304606"
+        ]
+    },
+    { 
+        "id": 1,
+        "desc": "Rio Grande do Sul - Litoral Norte", 
+        "accent": "#f33",
+        "level": "N8",
+        
+        "properties": {
+            "Nome": "José"
+        }, 
+        
+        "cities": [
+            "4321501", "4301057"
+        ]
+    }
+]
