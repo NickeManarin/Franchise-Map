@@ -1,6 +1,6 @@
 {
   "name": "franchise-map",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -26,7 +26,7 @@
     "chalk": "^4.0.0",
     "execa": "^4.0.0",
     "node-emoji": "^1.10.0",
-    "vue-cli-plugin-gh-pages-auto-deploy": "~0.3.0",
+    "vue-cli-plugin-gh-pages-auto-deploy": "~0.3.1",
     "vue-template-compiler": "^2.6.11"
   }
 }
