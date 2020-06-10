@@ -19,6 +19,7 @@ Vue.component('l-control-zoom', LControlZoom);
 
 Vue.prototype.$store = {
   cidades: {},
+  estados: {},
   franquias: [],
 };
 

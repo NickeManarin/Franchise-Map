@@ -52,6 +52,7 @@
 
             try {
                 this.$store.cidades = await require('@/assets/geo/br.json');
+                this.$store.estados = await require('@/assets/geo/states.json');
                 this.isLoading = false;
 
                 EventBus.$emit('baseLoaded');

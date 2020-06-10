@@ -64,9 +64,17 @@
                                     </div>
 
                                     <div class="column is-narrow">
-                                        <b-button class="button is-link is-hidden-tablet" type="is-danger" icon-left="trash" @click="removerFranquia(props.row)"></b-button>
+                                        <b-button class="button is-link is-hidden-desktop" type="is-light" icon-left="share" @click="exportarFranquia(props.row)"></b-button>
 
-                                        <b-button class="button is-link is-hidden-mobile" type="is-danger" icon-left="trash" @click="removerFranquia(props.row)">
+                                        <b-button class="button is-link is-hidden-touch" type="is-light" icon-left="share" @click="exportarFranquia(props.row)">
+                                            <span>Exportar</span>
+                                        </b-button>
+                                    </div>
+
+                                    <div class="column is-narrow">
+                                        <b-button class="button is-link is-hidden-desktop" type="is-danger" icon-left="trash" @click="removerFranquia(props.row)"></b-button>
+
+                                        <b-button class="button is-link is-hidden-touch" type="is-danger" icon-left="trash" @click="removerFranquia(props.row)">
                                             <span>Excluir</span>
                                         </b-button>
                                     </div>
@@ -306,10 +314,50 @@
                 <!-- For each franquias, Get geojson, get options -->
                 <l-geo-json v-for="franchise in (isEditing || isAdding ? [] : geoFranchisesFiltered)" :key="franchise.id" :geojson="franchise" :options="currentOptions" :options-style="getStyles(franchise)"/>
 
+                <l-geo-json v-if="showBase" :geojson="geoStates" :options-style="statesStyle"/>
                 <l-geo-json v-if="showBase" :geojson="geoBase" :options="baseOptions" :options-style="baseStyle"/>
                 <l-geo-json v-if="showBase" :geojson="geoSelected" :options="selectedOptions" :options-style="selectedStyle"/>
             </l-map>
         </div>
+
+        <b-modal :active.sync="isExportarFranquiaModalActive" trap-focus aria-role="dialog" aria-modal :minWidth="500" scroll="keep">
+            <div class="box has-text-centered content" style="padding: 40px">
+                <h2 class="title">Exportar franquia</h2>
+                <p class="subtitle">Escolha quais dados exportar</p>
+
+                <div class="columns is-centered is-multiline">
+                    <div class="column">
+                        <b-button class="is-light" @click="exportarFranquia(franquiaExport, 'all')">
+                            <article class="media">
+                                <figure class="media-left">
+                                    <b-icon class="is-size-3" icon="building"/>
+                                </figure>
+
+                                <div class="media-content">
+                                    <h5 class="is-size-4 has-text-weight-semibold">Franquia</h5>
+                                    <p class="is-size-5 has-text-grey">Exporta todos os dados da franquia</p>
+                                </div>
+                            </article>
+                        </b-button>
+                    </div>
+
+                    <div class="column">
+                        <b-button class="is-light" @click="exportarFranquia(franquiaExport, 'city')">
+                            <article class="media">
+                                <figure class="media-left">
+                                    <b-icon class="is-size-3" icon="map"/>
+                                </figure>
+
+                                <div class="media-content">
+                                    <h5 class="is-size-4 has-text-weight-semibold">Cidades</h5>
+                                    <p class="is-size-5 has-text-grey">Exporta apenas os nomes das cidades</p>
+                                </div>
+                            </article>
+                        </b-button>
+                    </div>
+                </div>
+            </div>
+        </b-modal>
 
         <b-loading :is-full-page="true" :active.sync="isLoading"></b-loading>
     </div>
@@ -333,6 +381,8 @@
                 file: null, /*Json sendo importado.*/
                 showBase: false,
                 openedDetails: [-1],
+                isExportarFranquiaModalActive: false,
+                franquiaExport: {},
 
                 isLoading: false,
                 isEditing: false,
@@ -350,11 +400,13 @@
                     zoomSnap: 0.1,
                     zoomControl: false
                 },
-                baseColor: "#009407", //"#ff3333", //"#e4ce7f",
+                baseColor: "#009407",
                 selectedColor: "#3388ff",
+                statesColor: "#303030",
 
                 geoBase: null,
                 geoSelected: null,
+                geoStates: null,
                 geoFranchises: [],
                 geoFranchisesFiltered: [],
 
@@ -386,6 +438,7 @@
         mounted(){
             EventBus.$on('baseLoaded', (err) => { 
                 this.geoBase = this.$store.cidades;
+                this.geoStates = this.$store.estados;
 
                 if (err != undefined)
                     this.showError('Não foi possível carregar a lista de cidades.');
@@ -397,6 +450,9 @@
 
             if (!this.isEmpty(this.$store.cidades))
                 this.geoBase = this.$store.cidades;
+
+            if (!this.isEmpty(this.$store.estados))
+                this.geoStates = this.$store.estados;
 
             if (!this.isEmpty(this.$store.franquias))
                 this.imported();
@@ -425,7 +481,7 @@
                 const blob = new Blob([data], {type: 'text/plain'})
                 const e = document.createEvent('MouseEvents'),
                 a = document.createElement('a');
-                a.download = "test.json";
+                a.download = "Franquias.json";
                 a.href = window.URL.createObjectURL(blob);
                 a.dataset.downloadurl = ['text/json', a.download, a.href].join(':');
                 e.initEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
@@ -605,6 +661,20 @@
                     s: saturation * 100,
                     v: value * 100
                 }).hsl().string();
+            },
+            generateBlob(name, obj, isJson) {
+                if (!name)
+                    name = 'Export' + (isJson ? '.json' : '');
+
+                const data = isJson ? JSON.stringify(obj) : obj;
+                const blob = new Blob([data], {type: 'text/plain'});
+                const e = document.createEvent('MouseEvents'),
+                a = document.createElement('a');
+                a.download = name;
+                a.href = window.URL.createObjectURL(blob);
+                a.dataset.downloadurl = ['text/json', a.download, a.href].join(':');
+                e.initEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+                a.dispatchEvent(e);
             },
 
             novaFranquia() {
@@ -866,6 +936,32 @@
                     onConfirm: () => this.cancelarEdição(true)
                 });
             },
+            exportarFranquia(row, type) {
+                if (type) {
+                    switch (type) {
+                        case "all":
+                            this.generateBlob('Franquia.json', row, true);
+                        break;
+
+                        case "city":
+                            var cidades = this.geoBase.features.filter(function(city) { 
+                                return row.cities.filter(function(f) { 
+                                    return f == city.properties.id;
+                                }).length > 0; 
+                            }).map(entry => { return entry.properties.name });
+
+                            this.generateBlob('Cidades.txt', cidades.join('\r\n'));
+                        break;
+                    }
+
+                    this.isExportarFranquiaModalActive = false;
+                    this.franquiaExport = {};
+                    return;
+                }
+
+                this.isExportarFranquiaModalActive = true;
+                this.franquiaExport = row;
+            },
             removerFranquia(row, remove) {
                 if (remove === true) {
                     this.$store.franquias = this.$store.franquias.filter(item => item.id !== row.id);
@@ -904,7 +1000,7 @@
                         weight: 2,
                         color: color,
                         fillColor: '#00fa0c',
-                        opacity: 0.4,
+                        opacity: 0.3,
                         fillOpacity: 0.1
                     };
                 };
@@ -977,6 +1073,22 @@
                 };
             },
 
+            statesStyle() {
+                //Touch this property to make the computed property recalculate.
+                const color = this.statesColor; 
+                
+                //https://leafletjs.com/reference-1.6.0.html#path
+                return () => {
+                    return {
+                        weight: 2,
+                        color: color,
+                        fillColor: color,
+                        opacity: 0.6,
+                        fillOpacity: 0
+                    };
+                };
+            },
+
             currentOptions() {
                 return {
                     onEachFeature: this.currentFeature
@@ -1017,7 +1129,7 @@
 
                 return this.geoBase.features.filter(city => {
                     return (city.properties.id + " - " + city.properties.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0;
-                }).slice(0, 50);
+                }).slice(0, 90);
             },
             openOnFocusHub() {
                 //Se nenhuma cidade foi selecionada ainda ou se o texto não for igual a selecionada, exibe o resultado.
@@ -1031,7 +1143,7 @@
 
                 return this.geoSelected.features.filter(city => {
                     return (city.properties.id + " - " + city.properties.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0;
-                }).slice(0, 20);
+                }).slice(0, 30);
             }
         },
     }
@@ -1166,6 +1278,28 @@
 
     .vue2leaflet-map {
         z-index: 5; /*Stays behind the sidebar*/
+    }
+
+    //Fills up the space.
+    .column {
+        height: 100%;
+    }
+
+    .box .column {
+        padding: 0.75rem 0.5rem !important;
+    }
+
+    //Makes the buttons inside the columns more rounded and expanded.
+    .column .button {
+        white-space: normal;
+        border-radius: 5px;
+        justify-content: stretch;
+    }
+
+    .box .column .button {
+        //padding: 0.75rem;
+        width: 100%;
+        height: 100%;
     }
 </style>
 
