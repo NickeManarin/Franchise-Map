@@ -50,6 +50,11 @@
                                         <span><strong>{{ key }}: </strong></span>
                                         <span>{{ props.row.properties[key] }}</span>
                                     </p>
+
+                                    <p>
+                                        <span><strong>População: </strong></span>
+                                        <span>{{ calcularPop(props.row).toLocaleString('pt-BR') }}</span>
+                                    </p>
                                 </div>
 
                                 <hr v-if="!isEmpty(props.row.properties)">
@@ -227,7 +232,21 @@
                     </div>
 
                     <!-- Cidades -->
-                    <p class="has-text-left has-margin-5">Cidades:</p>
+                    <p class="has-text-left has-margin-5">
+                        <nav class="level">
+                            <div class="level-left">
+                                <div class="level-item">
+                                    Cidades:
+                                </div>
+                            </div>
+
+                            <div class="level-right">
+                                <div class="level-item">
+                                   População: {{ totalPopulacao.toLocaleString('pt-BR') }}
+                                </div>
+                            </div>
+                        </nav>
+                    </p>
                     <div>
                         <b-table ref="tableEdit" class="has-margin-table" v-if="!isEmpty(geoSelected)" :data="geoSelected.features" hoverable
                             :default-sort-direction="defaultSortOrderCidade" :default-sort="[sortFieldCidade, sortOrderCidade]">
@@ -432,6 +451,8 @@
                 newCity: {},
                 hubCityText: '',
                 hubCity: {},
+
+                totalPopulacao: 0
             }
         },
 
@@ -478,6 +499,7 @@
             },
             exportar() {
                 const data = JSON.stringify(this.$store.franquias)
+                //const data = JSON.stringify(this.$store.cidades)
                 const blob = new Blob([data], {type: 'text/plain'})
                 const e = document.createEvent('MouseEvents'),
                 a = document.createElement('a');
@@ -519,6 +541,8 @@
                         }).length > 0; 
                     });
 
+                    var population = cidades.reduce((acc, next) => acc + next.properties.pop, 0);
+
                     list.push({
                         "type": "FeatureCollection",
                         "franquia_id": franchise.id,
@@ -531,6 +555,7 @@
                                     "id": franchise.id,
                                     "name": franchise.desc,
                                     "color": franchise.accent,
+                                    "pop": population,
                                 },
                                 "geometry": entry.geometry,
                             };
@@ -600,6 +625,15 @@
             },
             closeAllOtherDetails(row, index) {
                 this.openedDetails = [row.id];
+            },
+            calcularPop(row) {
+                var cidades = this.geoBase.features.filter(city => { 
+                    return row.cities.filter(function(f) { 
+                        return f == city.properties.id;
+                    }).length > 0; 
+                });
+
+                return cidades.reduce((acc, next) => acc + next.properties.pop, 0);
             },
 
             search() {
@@ -702,7 +736,9 @@
                     "type": "FeatureCollection",
                     "features": []
                 }
-                                
+                            
+                this.totalPopulacao = 0;
+
                 this.$nextTick().then(() => {
                     this.showBase = true;
                     this.$refs.nomeFranquiaInput.focus();
@@ -729,6 +765,8 @@
                 //Seleciona o objeto de cidade, para exibir o Id e nome no autocomplete.
                 this.hubCity = cidades.find(city => city.properties.id === this.franquiaEditando.hub);
                 this.$refs.hubCityInput.setSelected(this.hubCity);
+
+                this.totalPopulacao = cidades.reduce((acc, next) => acc + next.properties.pop, 0);
 
                 this.geoSelected = await {
                     "type": "FeatureCollection",
@@ -802,6 +840,9 @@
                 //Adicionar cidade para o objeto de cidade.
                 this.geoSelected.features.push(cidades[0]);
 
+                this.totalPopulacao = this.geoSelected.features.reduce((acc, next) => acc + next.properties.pop, 0);
+                console.log(this.totalPopulacao);
+
                 //Limpa as propriedades.
                 this.newCityText = '';
                 this.newCity = {};
@@ -833,6 +874,7 @@
 
                 //Remover cidade do objeto de cidade.
                 this.geoSelected.features = this.geoSelected.features.filter(item => item.properties.id !== cidades[0].properties.id);
+                this.totalPopulacao = this.geoSelected.features.reduce((acc, next) => acc + next.properties.pop, 0);
             },
 
             aceitarEdição() {
@@ -875,6 +917,9 @@
                 //Passar propriedades para o objeto principal.
                 this.$store.franquias.push(this.franquiaEditando);
 
+                //Soma o total de habitantes das cidades.
+                var population = this.geoSelected.features.reduce((acc, next) => acc + next.properties.pop, 0);
+
                 this.geoFranchises.push({
                     "type": "FeatureCollection",
                     "franquia_id": this.franquiaEditando.id,
@@ -887,6 +932,7 @@
                                 "id": this.franquiaEditando.id,
                                 "name": this.franquiaEditando.desc,
                                 "color": this.franquiaEditando.accent,
+                                "pop": population,
                             },
                             "geometry": entry.geometry,
                         };
@@ -948,9 +994,13 @@
                                 return row.cities.filter(function(f) { 
                                     return f == city.properties.id;
                                 }).length > 0; 
-                            }).map(entry => { return entry.properties.name });
+                            });
 
-                            this.generateBlob('Cidades.txt', cidades.join('\r\n'));
+                            var list = cidades.map(entry => { return entry.properties.name + ", " + entry.properties.pop });
+                            list.push('');
+                            list.push('Total: ' + cidades.reduce((acc, next) => acc + next.properties.pop, 0));
+
+                            this.generateBlob('Cidades.txt', list.join('\r\n'));
                         break;
                     }
 
@@ -1021,12 +1071,14 @@
 
                         //Adicionar cidade para o objeto de cidade.
                         this.geoSelected.features.push(cidades[0]);
+                        this.totalPopulacao = this.geoSelected.features.reduce((acc, next) => acc + next.properties.pop, 0);
                     });
 
                     //Adiciona tooltip nas cidades.
                     layer.bindTooltip("<div class=has-text-left>" + 
-                        "<p>Código: " + feature.properties.id + "</p>" + 
-                        "<p>Nome: " + feature.properties.name +"</p>" + 
+                        "<p><b>Código:</b> " + feature.properties.id + "</p>" + 
+                        "<p><b>Nome:</b> " + feature.properties.name +"</p>" + 
+                        "<p><b>Habit.:</b> " + feature.properties.pop.toLocaleString("pt-BR") +"</p>" + 
                         "<p>Clique para selecionar.</p>" + 
                         "</div>", {  
                         permanent: false, 
@@ -1063,13 +1115,12 @@
 
                     //Adiciona tooltip nas cidades.
                     layer.bindTooltip("<div class=has-text-left>" + 
-                        "<p>Código: " + feature.properties.id + "</p>" + 
-                        "<p>Nome: " + feature.properties.name +"</p>" + 
+                        "<p><b>Código:</b> " + feature.properties.id + "</p>" + 
+                        "<p><b>Nome:</b> " + feature.properties.name +"</p>" + 
+                        "<p><b>Habit.:</b> " + feature.properties.pop.toLocaleString("pt-BR") +"</p>" + 
                         "<p>Clique para remover seleção.</p>" + 
-                        "</div>", {  
-                        permanent: false, 
-                        sticky: true 
-                    });
+                        "</div>", 
+                        { permanent: false, sticky: true });
                 };
             },
 
@@ -1113,10 +1164,13 @@
                     });
 
                     //Adiciona tooltip nas cidades.
-                    layer.bindTooltip("<div class=has-text-left><p>Franquia: " + feature.franchise.name + "</p><p>Cidade: " + feature.properties.name +"</p></div>", { 
-                        permanent: false, 
-                        sticky: true 
-                    });
+                    layer.bindTooltip("<div class=has-text-left>" + 
+                        "<p><b>Franquia:</b> " + feature.franchise.name + "</p>" + 
+                        "<p><b>Cidade:</b> " + feature.properties.name + "</p>" + 
+                        "<p><b>Habit.:</b> " + feature.properties.pop.toLocaleString("pt-BR") + "</p>" + 
+                        "<p><b>Total:</b> " + feature.franchise.pop.toLocaleString("pt-BR") + "</p>" + 
+                        "</div>", 
+                        { permanent: false,  sticky: true });
                 };
             },
 

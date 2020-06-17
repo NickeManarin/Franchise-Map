@@ -47,12 +47,75 @@
             }
         },
 
+        methods: {
+            async putPopulation(){
+                var novos = await require('@/assets/geo/new.json');               
+                var csv = await require('raw-loader!@/assets/geo/hab.csv');
+                
+                var text = this.trimRight(this.trimLeft(csv.default, 'export default "'), '";');
+                var rows = text.toString().split('\\r\\n');
+
+                for (var index = 0; index < rows.length; index++) {
+                    var row = rows[index].split(';');
+
+                    var cityIndex = this.$store.cidades.features.findIndex(f => f.properties.id == row[0]);
+
+                    if (cityIndex > -1)
+                    {
+                        this.$store.cidades.features[cityIndex].properties.uf = row[2];
+                        this.$store.cidades.features[cityIndex].properties.pop = parseInt(row[3]);
+                    }
+                    else {
+                        console.log('Não encontrada: ' + cityIndex + ' - ' + row[1]);
+                        
+                        var novaCidade = novos.features.filter(f => f.properties.codarea == row[0])[0];
+
+                        if (novaCidade == undefined)
+                        {
+                            console.log(':( ' + row[0] + ' ' + row[1])
+                            continue;
+                        }
+                        else{
+                            console.log('Adicionada: ' + novaCidade);
+
+                            this.$store.cidades.features.push({
+                                "type": 'Feature',
+                                "properties": {
+                                    "id": row[0], 
+                                    "pop": parseInt(row[3]), 
+                                    "name": row[1], 
+                                    "description": row[1],
+                                    "uf": row[2],
+                                },
+                                "geometry": novaCidade.geometry,
+                            });
+                        }
+                    }
+                }
+            },
+            trimLeft(text, charlist) {
+                if (charlist === undefined)
+                    charlist = "\s";
+            
+                return text.replace(new RegExp("^[" + charlist + "]+"), "");
+            },
+            trimRight(text, charlist) {
+                if (charlist === undefined)
+                    charlist = "\s";
+            
+                return text.replace(new RegExp("[" + charlist + "]+$"), "");
+            },
+        },
+
         async created() {
             this.$buefy.config.setOptions(customIconConfig);
 
             try {
                 this.$store.cidades = await require('@/assets/geo/br.json');
                 this.$store.estados = await require('@/assets/geo/states.json');
+
+                //await this.putPopulation();
+
                 this.isLoading = false;
 
                 EventBus.$emit('baseLoaded');
