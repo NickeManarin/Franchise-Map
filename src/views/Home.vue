@@ -346,6 +346,8 @@
                 <l-tile-layer :url="url" :attribution="attribution"/>
                 <l-control-zoom position="bottomright"/>
 
+                <l-geo-json v-if="!showBase" :geojson="geoFind" :options="findOptions" :options-style="findStyle"/>
+
                 <!-- For each franquias, Get geojson, get options -->
                 <l-geo-json v-for="franchise in (isEditing || isAdding ? [] : geoFranchisesFiltered)" :key="franchise.id" :geojson="franchise" :options="currentOptions" :options-style="getStyles(franchise)"/>
 
@@ -439,12 +441,14 @@
                 baseColor: "#009407",
                 selectedColor: "#3388ff",
                 statesColor: "#303030",
+                findColor: "#202020",
 
                 geoBase: null,
                 geoSelected: null,
                 geoStates: null,
                 geoFranchises: [],
                 geoFranchisesFiltered: [],
+                geoFind: null,
 
                 sortFieldFranquia: "desc",
                 sortOrderFranquia: "asc",
@@ -654,7 +658,7 @@
             },
 
             search() {
-                if (this.searchText !== undefined || this.searchText.trim().length > 0) {
+                if (this.searchText !== undefined && this.searchText.trim().length > 0) {
                     let text = this.searchText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
                     if (this.searchByCity) {
@@ -666,6 +670,16 @@
                         this.franquiasFiltradas = this.$store.franquias.filter((item) => { 
                             return this.geoFranchisesFiltered.some(s => s.franquia_id === item.id);
                         });
+
+                        console.log('Length', this.searchText.trim().length);
+
+                        //Cidades em destaque:
+                        var find = this.geoFranchisesFiltered.map(m => m.features.filter(f => f.properties.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0));
+
+                        this.geoFind = {
+                            "type": "FeatureCollection",
+                            "features": this.selectMany(find)
+                        };
                     }
                     else {
                         //Pesquisar franquias por nome.
@@ -676,11 +690,20 @@
                         this.franquiasFiltradas = this.$store.franquias.filter((item) => { 
                             return item.desc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0;
                         });
+
+                        this.geoFind = {
+                            "type": "FeatureCollection",
+                            "features": []
+                        };
                     }
                 }
                 else {
                     this.geoFranchisesFiltered = this.geoFranchises.filter((item) => { return true });
                     this.franquiasFiltradas = this.$store.franquias.filter((item) => { return true });
+                    this.geoFind = {
+                        "type": "FeatureCollection",
+                        "features": []
+                    };
                 }
 
                 //Collapse franchises that are not part of the search result.
@@ -689,6 +712,15 @@
                 this.$nextTick().then(() => {
                     this.centerOnLayers();
                 });
+            },
+            selectMany(array, arr = []) {
+                for (let item of array) {
+                    if (item && item.length)
+                        arr = this.selectMany(item, arr);
+                    else
+                        arr.push(item);
+                }
+                return arr;
             },
             debounce(func, wait, immediate) {
                 var later = function() {
@@ -1150,6 +1182,56 @@
                         "<p>Clique para remover seleção.</p>" + 
                         "</div>", 
                         { permanent: false, sticky: true });
+                };
+            },
+
+            findOptions() {
+                return {
+                    onEachFeature: this.findFeature
+                };
+            },
+            findStyle() {
+                //Touch this property to make the computed property recalculate.
+                const color = this.findColor; 
+                
+                //https://leafletjs.com/reference-1.6.0.html#path
+                return () => {
+                    return {
+                        weight: 2,
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.7
+                    };
+                };
+            },
+            findFeature() {
+                return (feature, layer) => {
+                    console.log(feature);
+
+                    layer.on('click', e => {
+                        //Não abilita o clique durante a edição.
+                        if (this.isEditing === true || this.isAdding === true )
+                            return;
+
+                        //Exibir dados da franquia.
+                        var franquias = this.$store.franquias.filter(f => f.id === feature.franchise.id);
+
+                        if (franquias.length < 1) {
+                            this.showError('Não foi possível encontrar a franquia pela cidade.');
+                            return;
+                        }
+
+                        this.toggle(franquias[0]);
+                    });
+
+                    //Adiciona tooltip nas cidades.
+                    layer.bindTooltip("<div class=has-text-left>" + 
+                        "<p><b>Franquia:</b> " + feature.franchise.name + "</p>" + 
+                        "<p><b>Cidade:</b> " + feature.properties.name + "</p>" + 
+                        "<p><b>Habit.:</b> " + feature.properties.pop.toLocaleString("pt-BR") + "</p>" + 
+                        "<p><b>Total:</b> " + feature.franchise.pop.toLocaleString("pt-BR") + "</p>" + 
+                        "</div>", 
+                        { permanent: false,  sticky: true });
                 };
             },
 
