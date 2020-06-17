@@ -20,8 +20,24 @@
                 <section>
                     <div class="columns">
                         <div class="column">
-                            <p class="has-text-left">Filtro</p>
-                            <b-input v-model="searchText" placeholder="Filtre por nome de franquia" @input="debounce(() => { search() }, 300)"
+                            <p class="has-text-left">
+                                <nav class="level">
+                                    <div class="level-left">
+                                        <div class="level-item">
+                                            Filtro:
+                                        </div>
+                                    </div>
+
+                                    <div class="level-right">
+                                        <div class="level-item">
+                                            <b-checkbox v-model="searchByCity" size="is-small" @click="search()">
+                                                Filtre por cidade
+                                            </b-checkbox>
+                                        </div>
+                                    </div>
+                                </nav>
+                            </p>
+                            <b-input v-model="searchText" :placeholder="searchByCity ? 'Filtre por cidade da franquia' : 'Filtre por nome de franquia'" @input="debounce(() => { search() }, 300)"
                                 icon-left="search" icon-right="times-circle" icon-right-clickable @icon-right-click="searchText = ''; search()"></b-input>
                         </div>
                     </div>
@@ -410,6 +426,7 @@
                 timeout: undefined,
                 franquiasFiltradas: [],
                 searchText: '',
+                searchByCity: false,
 
                 zoom: 6,
                 center: latLng(-25.005973, -50.537109),
@@ -640,14 +657,26 @@
                 if (this.searchText !== undefined || this.searchText.trim().length > 0) {
                     let text = this.searchText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-                    //Pesquisar franquias por nome.
-                    this.geoFranchisesFiltered = this.geoFranchises.filter((item) => { 
-                        return item.franquia_nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0;
-                    });
+                    if (this.searchByCity) {
+                        //Pesquisar franquias por nome de cidade.
+                        this.geoFranchisesFiltered = this.geoFranchises.filter((item) => { 
+                            return item.features.some(s => s.properties.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0)
+                        });
 
-                    this.franquiasFiltradas = this.$store.franquias.filter((item) => { 
-                        return item.desc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0;
-                    });
+                        this.franquiasFiltradas = this.$store.franquias.filter((item) => { 
+                            return this.geoFranchisesFiltered.some(s => s.franquia_id === item.id);
+                        });
+                    }
+                    else {
+                        //Pesquisar franquias por nome.
+                        this.geoFranchisesFiltered = this.geoFranchises.filter((item) => { 
+                            return item.franquia_nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0;
+                        });
+
+                        this.franquiasFiltradas = this.$store.franquias.filter((item) => { 
+                            return item.desc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0;
+                        });
+                    }
                 }
                 else {
                     this.geoFranchisesFiltered = this.geoFranchises.filter((item) => { return true });
