@@ -30,7 +30,7 @@
 
                                     <div class="level-right">
                                         <div class="level-item">
-                                            <b-checkbox v-model="searchByCity" size="is-small" @click="search()">
+                                            <b-checkbox v-model="searchByCity" size="is-small" @input="search()">
                                                 Filtre por cidade
                                             </b-checkbox>
                                         </div>
