@@ -296,7 +296,8 @@
                             <div class="column">
                                 <b-autocomplete ref="newCityInput" v-model="newCityText" placeholder="Código ou nome da cidade" 
                                     :open-on-focus="openOnFocusCity" :keep-first="true" :custom-formatter="cidadeFormatter()"
-                                    :data="filteredCities" @select="option => newCity = option" @keyup.enter.native="adicionarCidade()" autoComplete="new-password">
+                                    :data="filteredCities" @select="option => newCity = option" @keyup.enter.native="adicionarCidade()" 
+                                    dropdown-position="top" autoComplete="new-password">
 
                                     <template slot-scope="props">
                                         <p>
