@@ -350,7 +350,8 @@
                 <l-geo-json v-if="!showBase" :geojson="geoFind" :options="findOptions" :options-style="findStyle"/>
 
                 <!-- For each franquias, Get geojson, get options -->
-                <l-geo-json v-for="franchise in (isEditing || isAdding ? [] : geoFranchisesFiltered)" :key="franchise.id" :geojson="franchise" :options="currentOptions" :options-style="getStyles(franchise)"/>
+                <!-- (isEditing || isAdding ? [] : geoFranchisesFiltered) -->
+                <l-geo-json v-for="franchise in geoFranchisesFiltered" :key="franchise.id" :geojson="franchise" :options="currentOptions" :options-style="getStyles(franchise)"/>
 
                 <l-geo-json v-if="showBase" :geojson="geoStates" :options-style="statesStyle"/>
                 <l-geo-json v-if="showBase" :geojson="geoBase" :options="baseOptions" :options-style="baseStyle"/>
@@ -636,7 +637,7 @@
                         weight: 2,
                         color: layer.features[0].franchise.color,
                         fillColor: layer.features[0].franchise.color,
-                        fillOpacity: 0.2
+                        fillOpacity: this.showBase ? 0.5 : 0.2
                     };
                 };
             },
@@ -1194,7 +1195,7 @@
             findStyle() {
                 //Touch this property to make the computed property recalculate.
                 const color = this.findColor; 
-                
+                                
                 //https://leafletjs.com/reference-1.6.0.html#path
                 return () => {
                     return {
