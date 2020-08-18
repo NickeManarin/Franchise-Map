@@ -2,7 +2,7 @@ import Vue from 'vue';
 import App from './App.vue';
 import router from './router';
 import Buefy from 'buefy';
-import { LMap, LTileLayer, LMarker, LGeoJson, LControlZoom } from 'vue2-leaflet';
+import { LMap, LTileLayer, LMarker, LGeoJson, LControlZoom, LLayerGroup } from 'vue2-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'verte/dist/verte.css';
 
@@ -15,6 +15,7 @@ Vue.component('l-map', LMap);
 Vue.component('l-tile-layer', LTileLayer);
 Vue.component('l-marker', LMarker);
 Vue.component('l-geo-json', LGeoJson);
+Vue.component('l-layer-group', LLayerGroup);
 Vue.component('l-control-zoom', LControlZoom);
 
 Vue.prototype.$store = {

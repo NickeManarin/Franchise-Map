@@ -1,5 +1,7 @@
 <template>
     <div class="home">
+        <b-loading :is-full-page="true" :active.sync="isLoading"/>
+
         <div class="is-sidebar">
             <div v-if="!isEditing && !isAdding" class="list">
                 <header>
@@ -347,15 +349,20 @@
                 <l-tile-layer :url="url" :attribution="attribution"/>
                 <l-control-zoom position="bottomright"/>
 
-                <l-geo-json v-if="!showBase" :geojson="geoFind" :options="findOptions" :options-style="findStyle"/>
+                <l-layer-group pane="tilePane">
+                    <l-geo-json :geojson="geoStates" :options-style="statesStyle"/>
+                </l-layer-group>
 
-                <!-- For each franquias, Get geojson, get options -->
-                <!-- (isEditing || isAdding ? [] : geoFranchisesFiltered) -->
-                <l-geo-json v-for="franchise in geoFranchisesFiltered" :key="franchise.id" :geojson="franchise" :options="currentOptions" :options-style="getStyles(franchise)"/>
+                <l-layer-group pane="overlayPane">
+                    <l-geo-json :geojson="geoBase" :options="baseOptions" :options-style="baseStyle"/>
+                    <l-geo-json v-if="showBase" :geojson="geoSelected" :options="selectedOptions" :options-style="selectedStyle"/>
 
-                <l-geo-json v-if="showBase" :geojson="geoStates" :options-style="statesStyle"/>
-                <l-geo-json v-if="showBase" :geojson="geoBase" :options="baseOptions" :options-style="baseStyle"/>
-                <l-geo-json v-if="showBase" :geojson="geoSelected" :options="selectedOptions" :options-style="selectedStyle"/>
+                    <!-- For each franquias, Get geojson, get options -->
+                    <!-- (isEditing || isAdding ? [] : geoFranchisesFiltered) -->
+                    <l-geo-json v-for="franchise in geoFranchisesFiltered" :key="franchise.id" :geojson="franchise" :options="currentOptions" :options-style="getStyles(franchise)"/>
+
+                    <l-geo-json v-if="!showBase" :geojson="geoFind" :options="findOptions" :options-style="findStyle"/>
+                </l-layer-group>
             </l-map>
         </div>
 
@@ -397,8 +404,6 @@
                 </div>
             </div>
         </b-modal>
-
-        <b-loading :is-full-page="true" :active.sync="isLoading"></b-loading>
     </div>
 </template>
 
@@ -434,7 +439,9 @@
 
                 zoom: 6,
                 center: latLng(-25.005973, -50.537109),
-                url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                //url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                //url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
                 attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
                 mapOptions: {
                     zoomSnap: 0.1,
@@ -509,6 +516,8 @@
 
         methods: {
             importar(){
+                this.isLoading = true;
+
                 const reader = new FileReader();
                 reader.onload = e => {
                     this.$store.franquias = JSON.parse(e.target.result);
@@ -518,7 +527,8 @@
                     //Limpe o arquivo selecionado, para poder ler novamente.
                     this.file = null;
                 };
-                reader.readAsText(this.file);
+
+                this.$nextTick().then(() => reader.readAsText(this.file));
             },
             exportar() {
                 const data = JSON.stringify(this.$store.franquias)
@@ -552,12 +562,12 @@
                     type: 'is-danger'
                 });
             },
-            imported() {
+            async imported() {
                 //Franquias foram importadas.
                 let list = [];
 
                 //Para cada franquia, buscar as cidade da lista de geoJsons.
-                this.$store.franquias.forEach(franchise => {
+                await this.$store.franquias.forEach(franchise => {
                     var cidades = this.geoBase.features.filter(function(city) { 
                         return franchise.cities.filter(function(f) { 
                              return f == city.properties.id;
@@ -588,6 +598,8 @@
 
                 this.geoFranchises = list;
                 this.search();
+
+                this.$nextTick().then(() => this.isLoading = false);
             },
             centerOnLayers(id){
                 //             North (+90)
@@ -616,7 +628,7 @@
                 
                 this.$refs.mapControl.mapObject.eachLayer((layer) => {
                     //Only zoom on franchises.
-                    if (layer.feature == undefined)
+                    if (layer.feature == null || layer.feature.franchise == null)
                         return;
 
                     //Zoom on the current selected franchise.
@@ -672,8 +684,6 @@
                         this.franquiasFiltradas = this.$store.franquias.filter((item) => { 
                             return this.geoFranchisesFiltered.some(s => s.franquia_id === item.id);
                         });
-
-                        console.log('Length', this.searchText.trim().length);
 
                         //Cidades em destaque:
                         var find = this.geoFranchisesFiltered.map(m => m.features.filter(f => f.properties.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(text) >= 0));
@@ -810,48 +820,53 @@
             async editarFranquia(row) {
                 this.isLoading = true;
                 this.isEditing = true;
-
-                var franquia = await this.$store.franquias.filter((item) => { return item.id === row.id});
-
-                //this.franquiaEditando = Object.assign({}, this.franquiaEditando, JSON.parse(JSON.stringify(this.$store.franquias[row.id])));
-                //this.franquiaEditando = Object.assign(this.franquiaEditando, JSON.parse(JSON.stringify(this.$store.franquias[row.id])));
-                this.franquiaEditando = await JSON.parse(JSON.stringify(franquia[0]));
-                this.franquiaEditando.idAtual = this.franquiaEditando.id; //Para deixar salvar em cima desse mesmo ID.
-
-                //Copiar cidades da franquia para o objeto selected.
-                var cidades = await this.geoBase.features.filter(city => { 
-                    return this.franquiaEditando.cities.filter(function(f) { 
-                        return f == city.properties.id;
-                    }).length > 0; 
-                });
-
-                //Seleciona o objeto de cidade, para exibir o Id e nome no autocomplete.
-                this.hubCity = cidades.find(city => city.properties.id === this.franquiaEditando.hub);
-                this.$refs.hubCityInput.setSelected(this.hubCity);
-
-                this.totalPopulacao = cidades.reduce((acc, next) => acc + next.properties.pop, 0);
-
-                this.geoSelected = await {
-                    "type": "FeatureCollection",
-                    "franquia_id": this.franquiaEditando.id,
-                    "franquia_nome": this.franquiaEditando.desc,
-                    "features": await cidades.map(entry => {
-                        return {
-                            "type": entry.type,
-                            "properties": entry.properties,
-                            "franchise": {
-                                "id": this.franquiaEditando.id,
-                                "name": this.franquiaEditando.desc,
-                                "color": this.franquiaEditando.accent,
-                            },
-                            "geometry": entry.geometry,
-                        };
-                    })
-                }
                 
-                this.showBase = true;
-                this.isLoading = false;
-                this.$refs.newCityInput.focus();
+                await this.$nextTick().then(async () => {
+                    var franquia = await this.$store.franquias.filter((item) => { return item.id === row.id});
+
+                    //this.franquiaEditando = Object.assign({}, this.franquiaEditando, JSON.parse(JSON.stringify(this.$store.franquias[row.id])));
+                    //this.franquiaEditando = Object.assign(this.franquiaEditando, JSON.parse(JSON.stringify(this.$store.franquias[row.id])));
+                    this.franquiaEditando = await JSON.parse(JSON.stringify(franquia[0]));
+                    this.franquiaEditando.idAtual = this.franquiaEditando.id; //Para deixar salvar em cima desse mesmo ID.
+
+                    //Copiar cidades da franquia para o objeto selected.
+                    var cidades = await this.geoBase.features.filter(city => { 
+                        return this.franquiaEditando.cities.filter(function(f) { 
+                            return f == city.properties.id;
+                        }).length > 0; 
+                    });
+
+                    //Seleciona o objeto de cidade, para exibir o Id e nome no autocomplete.
+                    this.hubCity = cidades.find(city => city.properties.id === this.franquiaEditando.hub);
+                    this.$refs.hubCityInput.setSelected(this.hubCity);
+
+                    this.totalPopulacao = cidades.reduce((acc, next) => acc + next.properties.pop, 0);
+
+                    this.geoSelected = await {
+                        "type": "FeatureCollection",
+                        "franquia_id": this.franquiaEditando.id,
+                        "franquia_nome": this.franquiaEditando.desc,
+                        "features": await cidades.map(entry => {
+                            return {
+                                "type": entry.type,
+                                "properties": entry.properties,
+                                "franchise": {
+                                    "id": this.franquiaEditando.id,
+                                    "name": this.franquiaEditando.desc,
+                                    "color": this.franquiaEditando.accent,
+                                },
+                                "geometry": entry.geometry,
+                            };
+                        })
+                    }
+
+                    this.showBase = true;
+                });   
+
+                this.$nextTick().then(() => {
+                    this.isLoading = false;
+                    this.$refs.newCityInput.focus();
+                });
             },
             colorChanged(color) {
                 this.franquiaEditando.accent = color;
@@ -904,7 +919,6 @@
                 this.geoSelected.features.push(cidades[0]);
 
                 this.totalPopulacao = this.geoSelected.features.reduce((acc, next) => acc + next.properties.pop, 0);
-                console.log(this.totalPopulacao);
 
                 //Limpa as propriedades.
                 this.newCityText = '';
@@ -1099,6 +1113,8 @@
 
         computed: {
             baseOptions() {
+                var touch = this.showBase;
+
                 return {
                     onEachFeature: this.baseFeature
                 };
@@ -1110,16 +1126,33 @@
                 //https://leafletjs.com/reference-1.6.0.html#path
                 return () => {
                     return {
+                        cursor: this.showBase ? 'pointer' : 'arrow',
                         weight: 2,
                         color: color,
-                        fillColor: '#00fa0c',
-                        opacity: 0.3,
-                        fillOpacity: 0.1
+                        fillColor: this.showBase ? '#00fa0c' : '#fffff0',
+                        opacity: this.showBase ? 0.3 : 0.05,
+                        fillOpacity: this.showBase ? 0.1 : 0.05
                     };
                 };
             },
             baseFeature() {
-                return (feature, layer) => {
+                return (feature, layer) => {   
+                    if (feature.properties.pop == null){
+                        return;
+                    }
+
+                    if (!this.showBase) {
+                        layer.bindTooltip("<div class=has-text-left>" + 
+                            "<p><b>Código:</b> " + feature.properties.id + "</p>" + 
+                            "<p><b>Nome:</b> " + feature.properties.name +"</p>" + 
+                            "<p><b>Habit.:</b> " + feature.properties.pop.toLocaleString("pt-BR") +"</p>" + 
+                            "</div>", {  
+                            permanent: false, 
+                            sticky: true 
+                        });
+                        return;
+                    }
+
                     layer.on('click', e => {
                         //Adicionar cidades para a lista de selecionadas.
                         var cidades = this.geoBase.features.filter(f => f.properties.id === feature.properties.id);
@@ -1151,14 +1184,17 @@
             },
 
             selectedOptions() {
+                var touch = this.showBase;
+
                 return {
                     onEachFeature: this.selectedFeature
                 };
             },
             selectedStyle() {
                 //Touch this property to make the computed property recalculate.
-                const color = this.selectedColor; 
-                
+                var color = this.selectedColor; 
+                var touch = this.showBase;
+
                 //https://leafletjs.com/reference-1.6.0.html#path
                 return () => {
                     return {
@@ -1208,7 +1244,9 @@
             },
             findFeature() {
                 return (feature, layer) => {
-                    console.log(feature);
+                    if (feature.properties.pop == null){
+                        return;
+                    }
 
                     layer.on('click', e => {
                         //Não abilita o clique durante a edição.
@@ -1237,6 +1275,11 @@
                 };
             },
 
+            statesOptions() {
+                return {
+                    onEachFeature: this.statesFeature
+                };
+            },
             statesStyle() {
                 //Touch this property to make the computed property recalculate.
                 const color = this.statesColor; 
@@ -1250,6 +1293,11 @@
                         opacity: 0.6,
                         fillOpacity: 0
                     };
+                };
+            },
+            statesFeature() {
+                return (feature, layer) => {
+
                 };
             },
 
