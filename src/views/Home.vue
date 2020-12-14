@@ -49,21 +49,19 @@
                         :show-detail-icon="false" selectable @select="toggle" :default-sort-direction="defaultSortOrderFranquia" 
                         :default-sort="[sortFieldFranquia, sortOrderFranquia]">
 
-                        <template slot-scope="props">
-                            <b-table-column class="is-unselectable" cell-class="has-pointer" field="id" label="Id" sortable>
-                                <span class="tag" :style="{ backgroundColor: props.row.accent }">
-                                    <strong>{{props.row.id}}</strong>
-                                </span>
-                            </b-table-column>
+                        <b-table-column class="is-unselectable" cell-class="has-pointer has-text-left" field="id" label="Id" sortable v-slot="props">
+                            <span class="tag has-text-left" :style="{ backgroundColor: props.row.accent }">
+                                <strong>{{props.row.id}}</strong>
+                            </span>
+                        </b-table-column>
 
-                            <b-table-column class="is-unselectable" cell-class="has-pointer" field="desc" label="Nome" sortable>
-                                {{props.row.desc}}
-                            </b-table-column>
-                        </template>
+                        <b-table-column class="is-unselectable" cell-class="has-pointer has-text-left" field="desc" label="Nome" sortable v-slot="props">
+                            {{props.row.desc}}
+                        </b-table-column>
 
                         <template slot="detail" slot-scope="props">
                             <div>
-                                <div class="has-detail">
+                                <div class="has-detail has-text-left">
                                     <p v-for="(item, key, index) in props.row.properties" :key="index">
                                         <span><strong>{{ key }}: </strong></span>
                                         <span>{{ props.row.properties[key] }}</span>
@@ -185,6 +183,7 @@
                     <div class="has-margin-5-children">
                         <p class="has-text-left">Nível:</p>
                         <b-select v-model="franquiaEditando.level" placeholder="Selecione o nível da franquia" expanded>
+                            <option value="N0">N0 - Sem Franquia</option>
                             <option value="N1">N1 - Estrutura</option>
                             <option value="N2">N2 - Contrato </option>
                             <option value="N3">N3 - Desenvolvimento</option>
@@ -268,19 +267,17 @@
                     <div>
                         <b-table ref="tableEdit" class="has-margin-table" v-if="!isEmpty(geoSelected)" :data="geoSelected.features" hoverable
                             :default-sort-direction="defaultSortOrderCidade" :default-sort="[sortFieldCidade, sortOrderCidade]">
-                            <template slot-scope="props">
-                                <b-table-column class="is-unselectable" width="90" cell-class="is-vertical" field="properties.id" label="Código" sortable>
-                                    <strong>{{props.row.properties.id}}</strong>
-                                </b-table-column>
+                            <b-table-column class="is-unselectable" width="90" cell-class="is-vertical has-text-left" field="properties.id" label="Código" sortable v-slot="props">
+                                <strong>{{props.row.properties.id}}</strong>
+                            </b-table-column>
 
-                                <b-table-column class="is-unselectable" cell-class="is-vertical" field="properties.name" label="Cidade" sortable :custom-sort="sortLocale">
-                                    {{props.row.properties.name}}
-                                </b-table-column>
+                            <b-table-column class="is-unselectable" cell-class="is-vertical has-text-left" field="properties.name" label="Cidade" sortable :custom-sort="sortLocale" v-slot="props">
+                                {{props.row.properties.name}}
+                            </b-table-column>
 
-                                <b-table-column class="is-unselectable" width="45" cell-class="has-pointer">
-                                    <b-button class="button is-link is-smaller" type="is-danger" icon-left="trash" @click="removerCidade(props.row)"></b-button>
-                                </b-table-column>
-                            </template>
+                            <b-table-column class="is-unselectable" width="45" cell-class="has-pointer has-text-left" v-slot="props">
+                                <b-button class="button is-link is-smaller" type="is-danger" icon-left="trash" @click="removerCidade(props.row)"></b-button>
+                            </b-table-column>
 
                             <template slot="empty">
                                 <section class="section">
