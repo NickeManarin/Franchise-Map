@@ -236,7 +236,7 @@
                                 :data="hubCityFiltered" @select="option => hubChanged(option)" autoComplete="new-password">
 
                                 <template slot-scope="props">
-                                    <p>
+                                    <p class="has-text-left">
                                         <span class="has-text-semibold">{{ props.option.properties.id }}</span>
                                         <span> - </span>
                                         <span>{{ props.option.properties.name }}</span>
@@ -299,7 +299,7 @@
                                     dropdown-position="top" autoComplete="new-password">
 
                                     <template slot-scope="props">
-                                        <p>
+                                        <p class="has-text-left">
                                             <span class="has-text-semibold">{{ props.option.properties.id }}</span>
                                             <span> - </span>
                                             <span>{{ props.option.properties.name }}</span>
@@ -398,6 +398,21 @@
                             </article>
                         </b-button>
                     </div>
+
+                    <!-- <div class="column">
+                        <b-button class="is-light" @click="exportarFranquia(franquiaExport, 'image')">
+                            <article class="media">
+                                <figure class="media-left">
+                                    <b-icon class="is-size-3" icon="map"/>
+                                </figure>
+
+                                <div class="media-content">
+                                    <h5 class="is-size-4 has-text-weight-semibold">Cidades</h5>
+                                    <p class="is-size-5 has-text-grey">Exporta a franquia como imagem</p>
+                                </div>
+                            </article>
+                        </b-button>
+                    </div> -->
                 </div>
             </div>
         </b-modal>
@@ -408,6 +423,7 @@
     import { latLng, featureGroup } from "leaflet";
     import verte from 'verte';
     import color from 'color';
+    import domtoimage from 'dom-to-image';
     import { EventBus } from '@/other/event-bus.js';
 
     export default {
@@ -598,7 +614,7 @@
 
                 this.$nextTick().then(() => this.isLoading = false);
             },
-            centerOnLayers(id){
+            async centerOnLayers(id){
                 //             North (+90)
                 //                |
                 // (-180) West ———+——— East (+180)
@@ -622,8 +638,8 @@
                     return;
 
                 var group = new featureGroup();
-                
-                this.$refs.mapControl.mapObject.eachLayer((layer) => {
+
+                await this.$refs.mapControl.mapObject.eachLayer((layer) => {
                     //Only zoom on franchises.
                     if (layer.feature == null || layer.feature.franchise == null)
                         return;
@@ -636,7 +652,7 @@
                 });
 
                 //Adjusts the padding to the sidebar.
-                var leftPad = (window.innerWidth < 769 ? 250 : window.innerWidth < 1024 ? 300 : 400) + 10; 
+                var leftPad = (window.innerWidth < 769 ? 250 : window.innerWidth < 1024 ? 300 : 400) + 200; 
                 this.$refs.mapControl.mapObject.fitBounds(group.getBounds(), { paddingTopLeft: [leftPad, 10], paddingBottomRight: [10, 10] });
             },
             getStyles(layer) {
@@ -650,10 +666,10 @@
                     };
                 };
             },
-            toggle(row) {
+            async toggle(row) {
                 this.$refs.table.toggleDetails(row);
 
-                this.centerOnLayers(row.id);
+                await this.centerOnLayers(row.id);
             },
             closeAllOtherDetails(row, index) {
                 this.openedDetails = [row.id];
@@ -1056,7 +1072,7 @@
                     onConfirm: () => this.cancelarEdição(true)
                 });
             },
-            exportarFranquia(row, type) {
+            async exportarFranquia(row, type) {
                 if (type) {
                     switch (type) {
                         case "all":
@@ -1075,6 +1091,14 @@
                             list.push('Total: ' + cidades.reduce((acc, next) => acc + next.properties.pop, 0));
 
                             this.generateBlob('Cidades.txt', list.join('\r\n'));
+                        break;
+
+                        case "image":
+                            var leftPad = (window.innerWidth < 769 ? 250 : window.innerWidth < 1024 ? 300 : 400) + 200; 
+                            var width = window.innerWidth;
+                            var height = window.innerHeight;
+
+                            window.open(await domtoimage.toPng(this.$refs.mapControl, { width, height }), "_blank");
                         break;
                     }
 
@@ -1110,15 +1134,16 @@
 
         computed: {
             baseOptions() {
-                var touch = this.showBase;
+                //var touch = this.showBase;
 
                 return {
-                    onEachFeature: this.baseFeature
+                    onEachFeature: this.baseFeatureNew
                 };
             },
             baseStyle() {
                 //Touch this property to make the computed property recalculate.
                 const color = this.baseColor; 
+                const base = this.showBase; 
                 
                 //https://leafletjs.com/reference-1.6.0.html#path
                 return () => {
@@ -1176,6 +1201,43 @@
                         "</div>", {  
                         permanent: false, 
                         sticky: true 
+                    });
+                };
+            },
+            baseFeatureNew() {
+                //Having a reactive baseFeature() would add a lot of hangs each time the property was being changed.
+                return (feature, layer) => {   
+                    if (feature.properties.pop == null){
+                        return;
+                    }
+
+                    layer.bindTooltip("<div class=has-text-left>" + 
+                        "<p><b>Código:</b> " + feature.properties.id + "</p>" + 
+                        "<p><b>Nome:</b> " + feature.properties.name +"</p>" + 
+                        "<p><b>Habit.:</b> " + feature.properties.pop.toLocaleString("pt-BR") +"</p>" + 
+                        "</div>", {  
+                        permanent: false, 
+                        sticky: true 
+                    });
+
+                    layer.on('click', e => {
+                        if (!this.showBase)
+                            return;
+
+                        //Adicionar cidades para a lista de selecionadas.
+                        var cidades = this.geoBase.features.filter(f => f.properties.id === feature.properties.id);
+
+                        if (cidades.length < 1) {
+                            this.showError('Não foi possível adicionar a cidade.');
+                            return;
+                        }
+
+                        //Adicionar cidade para o objeto de franquia.
+                        this.franquiaEditando.cities.push(cidades[0].properties.id);
+
+                        //Adicionar cidade para o objeto de cidade.
+                        this.geoSelected.features.push(cidades[0]);
+                        this.totalPopulacao = this.geoSelected.features.reduce((acc, next) => acc + next.properties.pop, 0);
                     });
                 };
             },
