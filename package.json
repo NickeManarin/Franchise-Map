@@ -14,7 +14,7 @@
     "core-js": "^3.8.1",
     "dom-to-image": "^2.6.0",
     "leaflet": "^1.7.1",
-    "node-sass": "^4.14.1",
+    "node-sass": "^7.0.0",
     "sass-loader": "^8.0.2",
     "verte": "0.0.12",
     "vue": "^2.6.12",
